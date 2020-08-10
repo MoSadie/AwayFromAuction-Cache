@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.reflect.TypeToken;
 import net.hypixel.api.HypixelAPI;
 import net.hypixel.api.exceptions.APIThrottleException;
 import net.hypixel.api.exceptions.HypixelAPIException;
@@ -17,9 +16,11 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -163,7 +164,26 @@ public class Main {
 
         AtomicInteger finishedCount = new AtomicInteger(); //This is just for display, do not trust.
 
+        File tmpCache = new File("./docs/usernames-tmp.json");
+        FileWriter output = null;
+
+        try {
+            tmpCache.createNewFile();
+            output = new FileWriter(tmpCache);
+            output.write("{");
+        } catch (FileNotFoundException e) {
+            System.out.println("File somehow not found!");
+            e.printStackTrace();
+            System.exit(24);
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(25);
+        }
+
+        final boolean[] first = {true};
+
         for(UUID uuid : uuidSet) {
+            FileWriter finalOutput = output;
             CompletableFuture<Void> nameFuture = CompletableFuture.runAsync(() -> {
                 try {
                     String url = "https://api.ashcon.app/mojang/v2/user/" + uuid.toString();
@@ -178,7 +198,9 @@ public class Main {
                     finishedCount.incrementAndGet();
                     if (finishedCount.get() % 100 == 0)
                         System.out.println("Fetching usernames " + (finishedCount.incrementAndGet()) + " of " + uuidSet.size() + " (" + percentify(finishedCount.doubleValue()/uuidSet.size()) + "%)");
-                    nameMap.put(uuid, response.username);
+//                    nameMap.put(uuid, response.username);
+                    finalOutput.write((!first[0] ? "," : "") + "\"" + uuid.toString() + "\":\"" + response.username + "\"");
+                    first[0] = false;
                 } catch (IOException | NullPointerException e) {
                     System.out.println("[WARNING] Failed to get username for UUID " + uuid.toString() + ", skipping UUID");
                     e.printStackTrace();
@@ -189,6 +211,8 @@ public class Main {
 
         try {
             theMainFuture.get(3, TimeUnit.HOURS);
+            output.write("}");
+            output.close();
         } catch (InterruptedException | ExecutionException e) {
             System.out.println("An Exception occurred resolving usernames, exiting without changes.");
             e.printStackTrace();
@@ -196,6 +220,10 @@ public class Main {
         }  catch (TimeoutException e) {
             System.out.println("We have timed out resolving usernames, exiting without changes.");
             System.exit(23);
+        } catch (IOException e) {
+            System.out.println("An IOException occurred caching usernames, exiting without changes.");
+            e.printStackTrace();
+            System.exit(27);
         }
 
         System.out.println("Finished resolving usernames");
@@ -208,11 +236,12 @@ public class Main {
             if (wasDeleted) {
                 System.out.println("Previous cache file successfully deleted.");
             }
-            FileWriter writer = new FileWriter(usernameCache);
-            Type typeToken = new TypeToken<Map<UUID, String>>() {}.getType();
-            System.out.println("Begin writing cache to file");
-            GSON.toJson(nameMap, typeToken, writer);
-            writer.close();
+            Files.move(tmpCache.toPath(), usernameCache.toPath(), StandardCopyOption.REPLACE_EXISTING);
+//            FileWriter writer = new FileWriter(usernameCache);
+//            Type typeToken = new TypeToken<Map<UUID, String>>() {}.getType();
+//            System.out.println("Begin writing cache to file");
+//            GSON.toJson(nameMap, typeToken, writer);
+//            writer.close();
             System.out.println("Cache has been written to file.");
         } catch (IOException e) {
             System.out.println("An IOException occurred saving cache to file, exiting without changes.");
