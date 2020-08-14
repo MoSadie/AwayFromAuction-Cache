@@ -1,6 +1,6 @@
 # AwayFromAuction-Cache
 
-![Username Cache Workflow Status](https://github.com/MoSadie/AwayFromAuction-Cache/workflows/Generate%20and%20Commit%20Cache/badge.svg)
+[![Username Cache Workflow Status](https://github.com/MoSadie/AwayFromAuction-Cache/workflows/Generate%20and%20Commit%20Cache/badge.svg)](https://github.com/MoSadie/AwayFromAuction-Cache/actions)
 
 Automatically generates and hosts the [AwayFromAuction username cache](docs/usernames.json).
 
