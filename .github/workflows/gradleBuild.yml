@@ -13,3 +13,9 @@ jobs:
           java-version: 1.8
       - name: Build Program
         run: './gradlew build'
+      - name: Test Program
+        if: ${{ success() }}
+        run: 'java -jar ./build/libs/AwayFromAuction-Cache-1.0.jar'
+        env:
+          HYPIXEL_API_KEY: ${{ secrets.HYPIXEL_API_KEY }}
+          AFA_C_TEST_MODE: 'true'

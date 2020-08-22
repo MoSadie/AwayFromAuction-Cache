@@ -1,9 +1,6 @@
 package io.github.mosadie.awayfromauctioncache;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import net.hypixel.api.HypixelAPI;
 import net.hypixel.api.exceptions.APIThrottleException;
@@ -16,9 +13,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -31,6 +26,8 @@ public class Main {
     public static HttpClient httpClient = HttpClientBuilder.create().build();
     public static Gson GSON = new Gson();
 
+    public static boolean testMode;
+
     public static void main(String[] args) {
         // get/check key from args or env
         String hypixelApiKey = null;
@@ -40,6 +37,13 @@ public class Main {
         } else if (System.getenv("HYPIXEL_API_KEY") != null) {
             System.out.println("Getting Hypixel API key from environment variable.");
             hypixelApiKey = System.getenv("HYPIXEL_API_KEY");
+        }
+
+        if (System.getenv("AFA_C_TEST_MODE") != null) {
+            System.out.println("Test mode enabled, will only fetch first page and use test file.");
+            testMode = true;
+        } else {
+            testMode = false;
         }
 
         if (hypixelApiKey == null) {
@@ -89,6 +93,30 @@ public class Main {
     public static void generateUsernameCache() {
         System.out.println("Begin generating username cache.");
 
+        File usernameCache = new File("./docs/usernames.json");
+
+        if (testMode) usernameCache = new File("./docs/usernames-test.json");
+
+        Map<UUID, String> previousNameMap = new HashMap<>();
+        if (usernameCache.exists()) {
+            System.out.println("Loading names from previous cache to roll over to new cache...");
+            try {
+                Type typeToken = new TypeToken<Map<String, String>>() {}.getType();
+                Map<String, String> tmpPrevMap = GSON.fromJson(new FileReader(usernameCache), typeToken);
+                System.out.println("Loading " + tmpPrevMap.size() + " previous mappings to reuse.");
+                for(String uuidString : tmpPrevMap.keySet()) {
+                    UUID uuid = UUID.fromString(uuidString);
+                    String username = tmpPrevMap.get(uuidString);
+                    previousNameMap.put(uuid, username);
+                }
+                System.out.println("Finished loading mappings from previous cache.");
+            } catch (FileNotFoundException | JsonIOException | JsonSyntaxException | IllegalArgumentException e) {
+                previousNameMap = new HashMap<>();
+                System.out.println("An exception occurred loading names from previous cache, ignoring previous cache. Details: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
         Set<UUID> uuidSet = new HashSet<>();
 
         // Grab all Auctions and extract unique UUIDs to set
@@ -99,7 +127,7 @@ public class Main {
             processAuctionsArray(uuidSet, reply.getAuctions());
             System.out.println("First page processing complete, fetching and processing " + reply.getTotalPages() + " total pages.");
 
-            for (int i = 1; i < reply.getTotalPages(); i++) {
+            for (int i = 1; i < reply.getTotalPages() && !testMode; i++) {
                 try {
                     System.out.println("Fetching page " + (i+1) + " of Skyblock Auctions.");
                     SkyBlockAuctionsReply pagedReply = hypixelAPI.getSkyBlockAuctions(i).get(1, TimeUnit.MINUTES);
@@ -157,6 +185,15 @@ public class Main {
         int finishedCount = 0; //This is just for display, do not trust.
 
         for(UUID uuid : uuidSet) {
+
+            if (previousNameMap.containsKey(uuid)) {
+                finishedCount++;
+                if (finishedCount % 100 == 0)
+                    System.out.println("Fetching usernames " + (finishedCount) + " of " + uuidSet.size() + " (" + percentify(((double)finishedCount)/uuidSet.size()) + "%)");
+                nameMap.put(uuid, previousNameMap.get(uuid));
+                continue;
+            }
+
             try {
                 String url = "https://api.ashcon.app/mojang/v2/user/" + uuid.toString();
                 HttpResponse httpResponse = httpClient.execute(new HttpGet(url));
@@ -182,7 +219,6 @@ public class Main {
         // Save as json to docs/usernames.json
         System.out.println("Begin saving cache to file.");
         try {
-            File usernameCache = new File("./docs/usernames.json");
             boolean wasDeleted = usernameCache.delete();
             if (wasDeleted) {
                 System.out.println("Previous cache file successfully deleted.");
