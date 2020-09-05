@@ -26,6 +26,8 @@ jobs:
         uses: EndBug/add-and-commit@v4.4.0
         with:
           add: './docs/usernames.json'
-          message: 'Updated Username Cache'
+          message: 'Automated - Updated Username Cache'
+          author_name: 'SadieBot'
+          author_email: '70802939+SadieBot@users.noreply.github.com'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
