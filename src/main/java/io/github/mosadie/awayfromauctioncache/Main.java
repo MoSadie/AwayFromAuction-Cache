@@ -183,13 +183,15 @@ public class Main {
         Map<UUID, String> nameMap = new HashMap<>();
 
         int finishedCount = 0; //This is just for display, do not trust.
+        int cachedCount = 0;
 
         for(UUID uuid : uuidSet) {
 
             if (previousNameMap.containsKey(uuid)) {
                 finishedCount++;
+                cachedCount++;
                 if (finishedCount % 100 == 0)
-                    System.out.println("Fetching usernames " + (finishedCount) + " of " + uuidSet.size() + " (" + percentify(((double)finishedCount)/uuidSet.size()) + "%)");
+                    System.out.println("Fetching usernames " + (finishedCount) + " of " + uuidSet.size() + " (" + percentify(((double)finishedCount)/uuidSet.size()) + "%) (" + cachedCount + " from previous cache)");
                 nameMap.put(uuid, previousNameMap.get(uuid));
                 continue;
             }
@@ -206,7 +208,7 @@ public class Main {
                 }
                 finishedCount++;
                 if (finishedCount % 100 == 0)
-                    System.out.println("Fetching usernames " + (finishedCount) + " of " + uuidSet.size() + " (" + percentify(((double)finishedCount)/uuidSet.size()) + "%)");
+                    System.out.println("Fetching usernames " + (finishedCount) + " of " + uuidSet.size() + " (" + percentify(((double)finishedCount)/uuidSet.size()) + "%) (" + cachedCount + " from previous cache)");
                 nameMap.put(uuid, response.username);
             } catch (IOException | NullPointerException e) {
                 System.out.println("[WARNING] Failed to get username for UUID " + uuid.toString() + ", skipping UUID");
